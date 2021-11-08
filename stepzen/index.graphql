@@ -1,11 +1,9 @@
 schema
   @sdl(
     files: [
-      "breweries.graphql"
-      "google-maps/common-types.graphql"
-      "google-maps/google-maps-find-place.graphql"
-      "google-maps/google-maps-place-details.graphql"
-      "extensions.graphql"
+      "ip-api/ip-api.graphql"
+      "frankfurter/frankfurter.graphql"
+      "ip-api/extensions/frankfurter.graphql"
     ]
   ) {
   query: Query
