@@ -1,11 +1,11 @@
 #! /usr/bin/env bash
-export STEPZEN_ACCOUNT=$(cat ~/.stepzen/prod-stepzen-config.yaml | shyaml get-value account)
+export STEPZEN_ACCOUNT=$(cat ~/.stepzen/stepzen-config.yaml | shyaml get-value account)
 export STEPZEN_HOST=stepzen
 export STEPZEN_MODEL=breweries
-export STEPZEN_APIKEY=$(cat ~/.stepzen/prod-stepzen-config.yaml | shyaml get-value apikey)
-export STEPZEN_ADMINKEY=$(cat ~/.stepzen/prod-stepzen-config.yaml | shyaml get-value adminkey)
+export STEPZEN_APIKEY=$(cat ~/.stepzen/stepzen-config.yaml | shyaml get-value apikey)
+export STEPZEN_ADMINKEY=$(cat ~/.stepzen/stepzen-config.yaml | shyaml get-value adminkey)
 export STEPZEN_CONFIGFILE=stepzen/config.yaml
-export APIGEE_ORG={apigee-org}
+export APIGEE_ORG=geirs-purdy-project
 export APIGEE_TEMPLATE_ZIP=apiproxy.zip
 export APIGEE_BASEPATH=/graphql/breweries
 export APIGEE_PROXYNAME=StepZen-Breweries-GraphQL

@@ -1,7 +1,7 @@
 configurationset:
   - configuration:
       name: cloudsql_config
-      uri: postgres://<user>:<password>@<host>:<port>/breweries
+      uri: postgres://postgres:@%PASS%@@@%HOST%@:@%PORT%@/breweries
   - configuration:
       name: google-maps
-      key: <apikey>
+      key: @%APIKEY%@

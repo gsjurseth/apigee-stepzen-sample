@@ -1,0 +1,15 @@
+{
+  "name": "APIZenProduct",
+  "displayName": "APIZenProduct",
+  "approvalType": "auto",
+  "attributes": [
+    {
+      "name": "access",
+      "value": "public"
+    }
+  ],
+  "description": "StepZen + Apigee Product",
+  "environments": [
+    "@%ENV%@"
+  ]
+}
