@@ -25,10 +25,10 @@ program.version('1.0');
 program
   .option('-o, --org <org>', 'Apigee organization')
   .option('-e, --env <env>', 'Apigee environment')
-  .option('-a, --apikey <apikey>', 'AZ apikey')
   .option('-t, --token <token>', 'auth token')
   .option('-b, --basepath <basepath>', 'proxy base path', "/graphql/breweries")
   .option('-s, --stepzenhost <stepzenhost>', 'stepzen host', "stepzen")
+  .option('-S, --schema-dir <schemaDir>', 'path to stepzen schema directory', "stepzen")
   .option('-m, --model <model>', 'stepzen model', "breweries")
   .option('-m, --model <model>', 'stepzen model', "breweries")
   .option('-i, --identity-token <id>', 'gcloud identity token')
@@ -48,13 +48,6 @@ const STEPZEN_FOLDER="api";
 const STEPZEN_HOST=opts.stepzenhost;
 const STEPZEN_MODEL=opts.model;
 const STEPZEN_CONFIGFILE=opts.config;
-
-const {
-  STEPZEN_ADMINKEY,
-  STEPZEN_APIKEY,
-  STEPZEN_ACCOUNT,
-  STEPZEN_SCHEMADIR, // defaults to stepzen
-} = process.env;
 
 try {
     run();
@@ -86,7 +79,7 @@ async function run() {
     configFile: STEPZEN_CONFIGFILE, // Optional, no default
     folder: STEPZEN_FOLDER ? STEPZEN_FOLDER : "api",
     host: STEPZEN_HOST ? STEPZEN_HOST : "stepzen",
-    schemaDir: STEPZEN_SCHEMADIR ? STEPZEN_SCHEMADIR : "stepzen",
+    schemaDir: opts.schemaDir
   };
 
   // deploy the stepzen bundle
@@ -140,7 +133,7 @@ async function validateAndUpdateOpts() {
         opts.STEPZEN_ADMINKEY = d.getAccountDetails.adminKey;
         opts.STEPZEN_APIKEY = d.getAccountDetails.apiKey;
         opts.STEPZEN_ACCOUNT = d.getAccountDetails.accountName;
-        console.log("Our opts: %j", opts);
+        //console.log("Our opts: %j", opts);
     });
 }
 
