@@ -35,7 +35,7 @@ gcloud sql instances patch demopg --authorized-networks=34.68.67.42/32
 PORT=5432
 HOST=$(gcloud sql instances describe demopg | grep connectionName | cut -d" " -f2)
 #PASS=snarfity
-APIKEY=AIzaSyARNO-IrjbhgC3mrp_oJjdTwKllI3moL7g
+APIKEY=changeme
 
 echo "Updating config"
 cp stepzen/config.yaml.sample stepzen/config.yaml
