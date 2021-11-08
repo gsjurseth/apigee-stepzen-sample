@@ -241,8 +241,6 @@ async function deployStepZenEndpoint(bundle) {
     endpointURI: endpointURI,
   };
 }
-
-//curl -X POST "https://apigee.googleapis.com/v1/organizations/geirs-purdy-project/environments/test1/resourcefiles?name=StepZen&type=properties" -H "Authorization: Bearer $(gcloud auth print-access-token)" -H "Content-type: multipart/form-data" -F file="apikey=lakezurich::stepzen.net+1000::0577c900dafd401b35106c0b61ba7eab27572424173b0861776978a3fc271116"
  
 // Check for extant StepZen propertyset
 function getSZPropertySet(apikey, token) {
