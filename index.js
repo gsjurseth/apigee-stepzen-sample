@@ -62,10 +62,10 @@ async function run() {
     if ( exists ) {
       console.log('Property set already there... Deleting before recreating')
       await delSZPropertySet(opts.STEPZEN_APIKEY, opts.token);
-      await createSZPropertySet(opts.STEPZEN_APIKEY, opts.token);
+      await createSZPropertySet(opts.STEPZEN_APIKEY, opts.STEPZEN_ADMINKEY, opts.token);
     }
     else {
-      createSZPropertySet(opts.apikey, opts.token);
+      createSZPropertySet(opts.STEPZEN_APIKEY, opts.STEPZEN_ADMINKEY, opts.token);
     }
 
 
@@ -105,6 +105,8 @@ async function run() {
     `
 Deployed an Apigee proxy with org = ${apigee_bundle.org}, backed by a StepZen endpoint
 at ${stepzenDeployedEndpoint.endpointURI}. These should both be functional now!
+
+Your Apigee API Key is : ${opts.apigeeAPIKey}. Pass this in as a queryparameter to your new proxy as apikey=${opts.apigeeAPIKey}
 `
   );
 }
@@ -271,11 +273,13 @@ function delSZPropertySet(apikey, token) {
 }
 
 // Create StepZen property set
-function createSZPropertySet(apikey, token) {
+function createSZPropertySet(apikey, adminkey, token) {
   const authHeader = `Bearer ${token}`;
   const URL = `${MGMT_URL}/${opts.org}/environments/${opts.env}/resourcefiles?name=StepZen&type=properties`;
   const form = new FormData();
-  form.append("file", `apikey=${apikey}`);
+  form.append("file", `#StepZen Properties
+apikey=${apikey}
+adminkey=${adminkey}`);
   const headers = form.getHeaders();
   headers.Authorization = authHeader;
   return axios
@@ -373,6 +377,9 @@ async function createDevStuff(apikey, token) {
         .catch( e => {
           console.log("Error creating product association in app: %s", e.message);
         });
+
+        // add our key back to opts so we can spit it out later
+        opts.apigeeAPIKey = key;
     })
     .catch( e => {
       console.log("Error creating app: %s", e.message);
