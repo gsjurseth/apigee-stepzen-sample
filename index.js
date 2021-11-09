@@ -10,7 +10,7 @@ const developer = require("./apigee-tpls/developer.json");
 const productTpl = require("./apigee-tpls/apiproduct.json");
 const { request, gql } = require('graphql-request');
 
-const ACCOUNT_ENDPOINT='https://berkeley.stepzen.net/api/winning-numbat/__graphql';
+const ACCOUNT_ENDPOINT='https://stepzen.stepzen.net/google/accountlinker/__graphql';
 
 const {
   getIntrospectionQuery,
@@ -26,12 +26,12 @@ program
   .option('-o, --org <org>', 'Apigee organization')
   .option('-e, --env <env>', 'Apigee environment')
   .option('-t, --token <token>', 'auth token')
-  .option('-b, --basepath <basepath>', 'proxy base path', "/graphql/breweries")
+  .option('-b, --basepath <basepath>', 'proxy base path', "/graphql/stepzample")
+  .option('-n, --proxy-name <proxyName>', 'name of apigee proxy', "StepzenProxy")
   .option('-s, --stepzenhost <stepzenhost>', 'stepzen host', "stepzen")
   .option('-S, --schema-dir <schemaDir>', 'path to stepzen schema directory', "stepzen")
-  .option('-m, --model <model>', 'stepzen model', "breweries")
-  .option('-m, --model <model>', 'stepzen model', "breweries")
-  .option('-i, --identity-token <id>', 'gcloud identity token')
+  .option('-m, --model <model>', 'stepzen model', "stepzample")
+  .option('-i, --identity-token <identityToken>', 'gcloud identity token')
   .option('-r, --region <region>', 'What region to create components in', 'us-central');
 
 program.parse(process.argv);
@@ -42,12 +42,11 @@ dotenv.config();
 
 const MGMT_URL = 'https://apigee.googleapis.com/v1/organizations';
 const APIGEE_TEMPLATE_ZIP = "apiproxy.zip";
-const APIGEE_PROXYNAME=opts.basepath;
-const APIGEE_BASEPATH="/graphql/breweries";
+const APIGEE_PROXYNAME=opts.proxyName;
+const APIGEE_BASEPATH=opts.basepath;
 const STEPZEN_FOLDER="api";
 const STEPZEN_HOST=opts.stepzenhost;
 const STEPZEN_MODEL=opts.model;
-const STEPZEN_CONFIGFILE=opts.config;
 
 try {
     run();
@@ -62,8 +61,8 @@ async function run() {
     let exists = await getSZPropertySet(opts.apikey, opts.token);
     if ( exists ) {
       console.log('Property set already there... Deleting before recreating')
-      await delSZPropertySet(opts.apikey, opts.token);
-      await createSZPropertySet(opts.apikey, opts.token);
+      await delSZPropertySet(opts.STEPZEN_APIKEY, opts.token);
+      await createSZPropertySet(opts.STEPZEN_APIKEY, opts.token);
     }
     else {
       createSZPropertySet(opts.apikey, opts.token);
@@ -76,7 +75,6 @@ async function run() {
     apikey: opts.STEPZEN_APIKEY,
     account: opts.STEPZEN_ACCOUNT,
     model: STEPZEN_MODEL,
-    configFile: STEPZEN_CONFIGFILE, // Optional, no default
     folder: STEPZEN_FOLDER ? STEPZEN_FOLDER : "api",
     host: STEPZEN_HOST ? STEPZEN_HOST : "stepzen",
     schemaDir: opts.schemaDir
@@ -89,19 +87,19 @@ async function run() {
     stepzen_api_key: opts.STEPZEN_APIKEY,
     stepzen_admin_key: opts.STEPZEN_ADMINKEY,
     template: APIGEE_TEMPLATE_ZIP,
-    org: opts.APIGEE_ORG,
+    org: opts.org,
     proxyname: APIGEE_PROXYNAME,
     basepath: APIGEE_BASEPATH,
-    token: opts.APIGEE_TOKEN,
+    token: opts.token,
     target: stepzenDeployedEndpoint.endpointURI,
   };
 
   // deploy Apigee Proxy
 
- // apigeeDeployedEndpoint = deployApigeeEndpoint(apigee_bundle);
+  apigeeDeployedEndpoint = deployApigeeEndpoint(apigee_bundle);
  
-    await delDevStuff(opts.apikey, opts.token);
-    await createDevStuff(opts.apikey, opts.token);
+  await delDevStuff(opts.apikey, opts.token);
+  await createDevStuff(opts.apikey, opts.token);
 
   console.log(
     `
@@ -115,7 +113,7 @@ at ${stepzenDeployedEndpoint.endpointURI}. These should both be functional now!
 async function getAccountDetails() {
   let query = `
     {
-  getAccountDetails(jwtToken: "${opts.id}") {
+  getAccountDetails(jwtToken: "${opts.identityToken}") {
     accountName
     adminKey
     apiKey
@@ -133,7 +131,6 @@ async function validateAndUpdateOpts() {
         opts.STEPZEN_ADMINKEY = d.getAccountDetails.adminKey;
         opts.STEPZEN_APIKEY = d.getAccountDetails.apiKey;
         opts.STEPZEN_ACCOUNT = d.getAccountDetails.accountName;
-        //console.log("Our opts: %j", opts);
     });
 }
 
@@ -156,15 +153,11 @@ function deployApigeeEndpoint(bundle) {
       const options = {
         files: `${folder}/apiproxy/**/*.xml`,
         from: [
-          "$STEPZEN_APIKEY",
-          "$STEPZEN_ADMINKEY",
           "$APIGEE_TARGET",
           "$APIGEE_BASEPATH",
           "$APIGEE_PROXYNAME",
         ],
         to: [
-          bundle.stepzen_api_key,
-          bundle.stepzen_admin_key,
           bundle.target,
           bundle.basepath,
           bundle.proxyname,
@@ -344,6 +337,7 @@ async function createDevStuff(apikey, token) {
   let apiproduct = productTpl;
 
   apiproduct.environments[0] = opts.env;
+  apiproduct.operationGroup.operationConfigs[0].apiSource = opts.proxyName;
 
   let headers = {};
   headers.Authorization = authHeader;
@@ -389,16 +383,27 @@ async function createDevStuff(apikey, token) {
 // create and/or update the apigee proxy
 function createUpdateProxy(proxyzip, token) {
   const authHeader = `Bearer ${token}`;
-  const URL = `https://apigee.googleapis.com/v1/organizations/${APIGEE_ORG}/apis?name=${APIGEE_PROXYNAME}&action=import`;
+  const URL = `https://apigee.googleapis.com/v1/organizations/${opts.org}/apis?name=${APIGEE_PROXYNAME}&action=import`;
   const form = new FormData();
   form.append("file", fs.createReadStream(proxyzip));
   const headers = form.getHeaders();
   headers.Authorization = authHeader;
   axios
     .post(URL, form, { headers: headers })
-    .then(function (response) {
+    .then(async function (response) {
+      let rev = response.data.revision;
+      let deployURL = `https://apigee.googleapis.com/v1/organizations/${opts.org}/environments/${opts.env}/apis/${opts.proxyName}/revisions/${rev}/deployments`;
       console.log(response.status, response.statusText);
       //console.log(response.data);
+      await axios
+        .post(deployURL,'', { headers: headers } )
+        .then( d => {
+            console.log( "deployment status: %s", d.statusText);
+        })
+        .catch(function (error) {
+          console.log(error.message);
+          console.log(error.toJSON());
+        });
     })
     .catch(function (error) {
       console.log(error.message);
