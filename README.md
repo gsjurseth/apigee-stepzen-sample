@@ -1,60 +1,59 @@
 # Google Apigee-StepZen Demo
+This repo contains a script that makes it easy to quickly spin up a StepZen hosted GraphQL endpoint fronted
+with an Apigee depoyed Proxy (Apigee Hybrid or Apigee X)
 
-1. Cloud SQL
-1. Maps API
-1. _StepZen_
-1. _Apigee_
+## Prereqs
+* existing Apigee X or Apigee Hybrid org 
+* gcloud
+* nodejs (for the execution of the script)
+ ** including npm or yarn
 
-## Steps
+## Setting it all up
+The whole setup is fully automated and as simple as running the following:
+```bash
+# Make sure our dependencies are installed
+npm i # or yarn if you prefer
 
-1. Create Cloud SQL instance
+# now lets run the script proper
+node index.js -o geirs-purdy-project -n sz -e test1 -t $(gcloud auth print-access-token) -i $(gcloud auth print-identity-token)
+```
 
-`gcloud sql instances create demopg --database-version=POSTGRES_13 --memory=4096MB --cpu=2 --region=us-central`
+## Testing the setup
+Once this finishes you should see your apigee api key outputed on the screen. Copy that key and execute a curl command like so:
 
-2. Create database
+```bash
+curl -X POST 'https://<hostname>/graphql/stepzample?apikey=<your_api_key>' -H 'Accept-Encoding: gzip, deflate, br' -H 'Content-Type: application/json' -H 'Accept: application/json' --data-binary '{"query":"{\n  location(ip: \"8.8.8.8\") {\n    as\n    city\n    continent\n    country\n    countryCode\n  }\n}","variables":{}}' --compressed
+```
 
-`gcloud sql databases create breweries --instance=demopg`
+That will ouptut the following:
+```json
+{
+	"data": {
+		"location": {
+			"as": "AS15169 Google LLC",
+			"city": "Ashburn",
+			"continent": "North America",
+			"country": "United States",
+			"countryCode": "US"
+		}
+	}
+}
+```
 
-3. Set password for default user
+## Other schemas
+There are some other schemas available. 
 
-`gcloud sql users set-password postgres --instance=demopg --prompt-for-password`
+### Breweries example
+The [breweries example](stepzen-breweries-example) includes a StepZen schema that proxies for a db
+located in cloudsql. There's a separate readme there to get the backends setup and ready.
 
-4. Start Cloud SQL Proxy.
+Once that's setup you can execute the same script from above to load this sample.
 
-`cloud_sql_proxy -instances=$(gcloud sql instances describe demopg | grep connectionName | cut -d\ -f2)=tcp:5432`
+```bash
+node index.js -o geirs-purdy-project -n sz -e test1 -t $(gcloud auth print-access-token) -i $(gcloud auth print-identity-token) -m breweries -S stepzen-breweries-example
+```
 
-5. Connect to db using psql client
+Here we've added an argument for the path to the breweries-schema setup plus set the model name to breweries.
 
-`psql "host=127.0.0.1 sslmode=disable dbname=breweries user=postgres"`
-
-6. run the `breweries.sql` file
-
-`breweries=> \i breweries.sql`
-
-7. `exit` plsql and kill the cloud_sql_proxy session. Database is loaded.
-
-8. Set network access for StepZen to connect to db
-
-`gcloud sql instances patch demopg --authorized-networks=34.68.67.42/32`
-
-9. Copy `stepzen/config.yaml.sample` to `stepzen/config.yaml`
-
-10. Set postgres user/pass/ip in `stepzen/config.yaml`
-
-11. Set Google Maps apikey in `stepzen/config.yaml`
-
-12. Set {apigee-org} in `apizen-template`
-
-13. If you have not already installed the stepzen cli do steps 14 and 15, otherwise skip to step 17.
-
-14. `npm install -g stepzen`
-
-15. `stepzen login` (follow prompts, getting account info from https://stepzen.com/account)
-
-16. `stepzen list schemas` just to confirm things work
-
-17. `npm install`
-
-18. `./apizen-template` to deploy the StepZen GraphQL API, and deploy the Apigee bundle.
-
-19. Log in to Apigee, create products and apps, and deploy the Apigee proxy.
+### *SNARF* Thundercats example
+More examples for the people
