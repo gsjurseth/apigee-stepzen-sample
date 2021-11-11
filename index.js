@@ -32,7 +32,8 @@ program
   .option('-S, --schema-dir <schemaDir>', 'path to stepzen schema directory', "stepzen")
   .option('-m, --model <model>', 'stepzen model', "stepzample")
   .option('-i, --identity-token <identityToken>', 'gcloud identity token')
-  .option('-r, --region <region>', 'What region to create components in', 'us-central');
+  .option('-r, --region <region>', 'What region to create components in', 'us-central')
+  .option('-d, --debug', 'turn on more debug info');
 
 program.parse(process.argv);
 
@@ -56,6 +57,7 @@ try {
 
 // Main run function
 async function run() {
+    if (opts.debug) console.log("Starting run...");
     await validateAndUpdateOpts();
     // Let's start by dealing with the propertyset
     let exists = await getSZPropertySet(opts.apikey, opts.token);
@@ -81,6 +83,7 @@ async function run() {
   };
 
   // deploy the stepzen bundle
+  if (opts.debug) console.log("About to deploy StepZen endpoint with bundle: %j", stepzen_bundle);
   stepzenDeployedEndpoint = await deployStepZenEndpoint(stepzen_bundle);
 
   const apigee_bundle = {
@@ -95,7 +98,7 @@ async function run() {
   };
 
   // deploy Apigee Proxy
-
+  if (opts.debug) console.log("About to deploy Apigee Proxy with bundle: %j", apigee_bundle);
   apigeeDeployedEndpoint = deployApigeeEndpoint(apigee_bundle);
  
   await delDevStuff(opts.apikey, opts.token);
@@ -122,6 +125,8 @@ async function getAccountDetails() {
   }
 }
 `;
+
+  if (opts.debug) console.log("About to call StepZen account endpoint with query: %s", query);
   return request(ACCOUNT_ENDPOINT, query);
 }
 
@@ -130,9 +135,16 @@ async function getAccountDetails() {
 async function validateAndUpdateOpts() {
     getAccountDetails()
     .then( d => {
+        if (opts.debug) console.log("Setting ADMINKEY: %s, APIKEY:%s, and ACCOUNT:%s", d.getAccountDetails.adminKey, d.getAccountDetails.apiKey, d.getAccountDetails.accountName);
+
         opts.STEPZEN_ADMINKEY = d.getAccountDetails.adminKey;
         opts.STEPZEN_APIKEY = d.getAccountDetails.apiKey;
         opts.STEPZEN_ACCOUNT = d.getAccountDetails.accountName;
+    })
+    .catch( e => {
+        console.error( `Failed while calling StepZen account endpoint with: ${e.message}`);
+        console.error( "Are you sure you provided a proper id token?");
+        process.exit(1);
     });
 }
 
@@ -143,11 +155,12 @@ function deployApigeeEndpoint(bundle) {
     if (err) throw err;
     console.log(`Using temp folder: ${folder}`);
     // unzip template zip to temp folder
+    if (opts.debug) console.log("Unzipping %s into Folder: %s", bundle.template, folder);
     const unzipcmd = `unzip ${bundle.template} -d ${folder}`;
     exec(unzipcmd, (error, stdout, stderr) => {
       if (error) throw error;
       if (stderr) {
-        console.log(`stderr: ${stderr}`);
+        console.error(`Unzip error! stderr: ${stderr}`);
         return;
       }
       // console.log(`stdout: ${stdout}`);
@@ -176,27 +189,31 @@ function deployApigeeEndpoint(bundle) {
           .then(function (data) {
             //console.log("downloadSchema:", data);
             let where = `${folder}/apiproxy/resources/graphql`;
+            if (opts.debug) console.log("Updating exploded proxy with graphql scheme file here: %s", where);
             saveToFile(where, data)
               .then(function () {
                 console.log("schema saved.");
                 //  rezip files
                 const zipcmd = `zip -r apiproxy.zip apiproxy`;
-                exec(zipcmd, { cwd: `${folder}` }, (error, stdout, stderr) => {
+                exec(zipcmd, { cwd: `${folder}` }, async (error, stdout, stderr) => {
                   if (error) throw error;
                   if (stderr) {
                     console.log(`stderr: ${stderr}`);
                   }
                   // console.log(`stdout: ${stdout}`);
                   // upload new zip to apigee
-                  createUpdateProxy(`${folder}/apiproxy.zip`, bundle.token);
+                  await createUpdateProxy(`${folder}/apiproxy.zip`, bundle.token);
+
+                  if (opts.debug) console.log("About to delete temp directory: %s", folder);
+                  fs.rmdirSync(folder, { recursive: true });
                 });
               })
               .catch(function (error) {
-                console.log("saveToFile:", error);
+                console.error("Failed while saving scheme. SaveToFile:", error);
               });
           })
           .catch(function (error) {
-            console.log("downloadSchema:", error);
+            console.error("Failed while downloading schema from graphql endpoint. downloadSchema:", error);
           });
       });
     });
@@ -213,9 +230,11 @@ async function deployStepZenEndpoint(bundle) {
   });
   var configurationSets = ["stepzen/default"];
   if (bundle.configFile) {
+    if (opts.debug) console.log("Going to upload configurationset to StepZen using endpoint: %s", endpoint);
     await client.upload.configurationset(endpoint, bundle.configFile);
     configurationSets = [endpoint, "stepzen/default"];
   }
+  if (opts.debug) console.log("Uploading schema from: %s", bundle.schemaDir);
   await client.upload.schema(endpoint, bundle.schemaDir);
   await client.deploy(endpoint, {
     configurationsets: configurationSets,
@@ -251,8 +270,7 @@ function getSZPropertySet(apikey, token) {
       }
     })
     .catch(function (error) {
-      console.log(error.message);
-      console.log(error.toJSON());
+      console.error("Failed while trying to fetch StepZen property set: %s", error.message);
     });
 }
 
@@ -268,7 +286,7 @@ function delSZPropertySet(apikey, token) {
       console.log("Deleted property set");
     })
     .catch( e => {
-      console.log("Error deleting property set: %j", e.response);
+      console.error("Error deleting property set: %j", e.message);
     });
 }
 
@@ -288,8 +306,7 @@ adminkey=${adminkey}`);
       console.log("Created property set");
     })
     .catch(function (error) {
-      console.log(error.message);
-      console.log(error.toJSON());
+      console.error("Failed while trying to create StepZen property set: %s", error.message);
     });
 }
 
@@ -309,7 +326,7 @@ async function delDevStuff(apikey, token) {
       console.log("Deleted App");
     })
     .catch( e => {
-      console.log("Error deleting app: %j", e.response);
+      console.error("Error deleting app: %j", e.message);
     });
 
   await axios
@@ -318,7 +335,7 @@ async function delDevStuff(apikey, token) {
       console.log("Deleted Developer");
     })
     .catch( e => {
-      console.log("Error deleting developer: %j", e.response);
+      console.error("Error deleting developer: %j", e.message);
     });
 
   await axios
@@ -327,7 +344,7 @@ async function delDevStuff(apikey, token) {
       console.log("Deleted API Product");
     })
     .catch( e => {
-      console.log("Error deleting apiproduct: %j", e.response);
+      console.error("Error deleting apiproduct: %j", e.message);
     });
 }
  
@@ -353,7 +370,7 @@ async function createDevStuff(apikey, token) {
       console.log("Created Developer");
     })
     .catch( e => {
-      console.log("Error creating developer: %s", e.message);
+      console.error("Error creating developer: %s", e.message);
     });
 
   await axios
@@ -362,7 +379,7 @@ async function createDevStuff(apikey, token) {
       console.log("Created API Product");
     })
     .catch( e => {
-      console.log("Error creating apiproduct: %s", e.message);
+      console.error("Error creating apiproduct: %s", e.message);
     });
 
   await axios
@@ -375,14 +392,14 @@ async function createDevStuff(apikey, token) {
             console.log( "Created key and product association" );
         })
         .catch( e => {
-          console.log("Error creating product association in app: %s", e.message);
+          console.error("Error creating product association in app: %s", e.message);
         });
 
         // add our key back to opts so we can spit it out later
         opts.apigeeAPIKey = key;
     })
     .catch( e => {
-      console.log("Error creating app: %s", e.message);
+      console.error("Error creating app: %s", e.message);
     });
 
 }
@@ -399,27 +416,27 @@ function createUpdateProxy(proxyzip, token) {
     .post(URL, form, { headers: headers })
     .then(async function (response) {
       let rev = response.data.revision;
-      let deployURL = `https://apigee.googleapis.com/v1/organizations/${opts.org}/environments/${opts.env}/apis/${opts.proxyName}/revisions/${rev}/deployments`;
+      let deployURL = `https://apigee.googleapis.com/v1/organizations/${opts.org}/environments/${opts.env}/apis/${opts.proxyName}/revisions/${rev}/deployments?override=true`;
       console.log(response.status, response.statusText);
       //console.log(response.data);
       await axios
         .post(deployURL,'', { headers: headers } )
         .then( d => {
-            console.log( "deployment status: %s", d.statusText);
+            console.log( "Successfully deployed your proxy. Deployment status: %s", d.statusText);
         })
         .catch(function (error) {
-          console.log(error.message);
-          console.log(error.toJSON());
+          console.error("Failed deploying proxy: %s", error.message);
+          console.error(error);
         });
     })
     .catch(function (error) {
-      console.log(error.message);
-      console.log(error.toJSON());
+      console.error("Failed while trying to upload Apigee proxy: %s", error.message);
     });
 }
 
 // fetch the schema from the stepzen endpoint
 function downloadSchema(endpoint, headers) {
+  if (opts.debug) console.log("Downloading schema");
   return new Promise((resolve, reject) => {
     let body = JSON.stringify({ query: getIntrospectionQuery() });
     axios
@@ -433,14 +450,14 @@ function downloadSchema(endpoint, headers) {
         resolve(out.replace(regx, ""));
       })
       .catch(function (error) {
-        //console.log(error);
-        reject(error);
+        console.error("Failed deploying proxy: %s", error.message);
       });
   });
 }
 
 // write schema to a file
 function saveToFile(location, schema) {
+  if (opts.debug) console.log(`Saving schema to: ${location}/schema.graphql`);
   return new Promise((resolve, reject) => {
     try {
       let out = path.resolve(location);
