@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 const dotenv = require("dotenv");
 const replace = require("replace-in-file");
 const { exec } = require("child_process");
@@ -23,16 +24,15 @@ const { program } = require('commander');
 program.version('1.0');
 
 program
-  .option('-o, --org <org>', 'Apigee organization')
-  .option('-e, --env <env>', 'Apigee environment')
-  .option('-t, --token <token>', 'auth token')
+  .requiredOption('-o, --org <org>', 'Apigee organization')
+  .requiredOption('-e, --env <env>', 'Apigee environment')
+  .requiredOption('-t, --token <token>', 'access token .. usually $(gcp auth print-access-token)')
+  .requiredOption('-i, --identity-token <identityToken>', 'gcloud identity token .. usually $(gcp auth print-identity-token)')
   .option('-b, --basepath <basepath>', 'proxy base path', "/graphql/stepzample")
   .option('-n, --proxy-name <proxyName>', 'name of apigee proxy', "StepzenProxy")
   .option('-s, --stepzenhost <stepzenhost>', 'stepzen host', "stepzen")
   .option('-S, --schema-dir <schemaDir>', 'path to stepzen schema directory', "stepzen")
   .option('-m, --model <model>', 'stepzen model', "stepzample")
-  .option('-i, --identity-token <identityToken>', 'gcloud identity token')
-  .option('-r, --region <region>', 'What region to create components in', 'us-central')
   .option('-z, --show-creds', 'Display StepZen creds when we finish setting everything up', false)
   .option('-d, --debug', 'turn on more debug info');
 
