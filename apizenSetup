@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-const dotenv = require("dotenv");
 const replace = require("replace-in-file");
 const { exec } = require("child_process");
 const util = require('util');
@@ -39,8 +38,6 @@ program
 program.parse(process.argv);
 
 const opts = program.opts();
-
-dotenv.config();
 
 const MGMT_URL = 'https://apigee.googleapis.com/v1/organizations';
 const APIGEE_TEMPLATE_ZIP = "apiproxy.zip";
@@ -143,7 +140,19 @@ async function getAccountDetails() {
 `;
 
   if (opts.debug) console.log("About to call StepZen account endpoint with query: %s", query);
-  return request(ACCOUNT_ENDPOINT, query);
+  return request(ACCOUNT_ENDPOINT, query)
+    .then( d => {
+        if (d.getAccountDetails.accountName.length > 0)
+            return d;
+        else {
+            console.error("Failed fetching account info from StepZen account endpoint. No data. Fetched Object: %j", d);
+            process.exit(1);
+        }
+    })
+    .catch( e => {
+        console.error("Failed fetching account info from StepZen account endpoint. Error: ", e);
+        process.exit(1);
+    })
 }
 
 
