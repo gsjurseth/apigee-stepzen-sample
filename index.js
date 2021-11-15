@@ -33,6 +33,7 @@ program
   .option('-m, --model <model>', 'stepzen model', "stepzample")
   .option('-i, --identity-token <identityToken>', 'gcloud identity token')
   .option('-r, --region <region>', 'What region to create components in', 'us-central')
+  .option('-z, --show-creds', 'Display StepZen creds when we finish setting everything up', false)
   .option('-d, --debug', 'turn on more debug info');
 
 program.parse(process.argv);
@@ -109,7 +110,22 @@ async function run() {
 Deployed an Apigee proxy with org = ${apigee_bundle.org}, backed by a StepZen endpoint
 at ${stepzenDeployedEndpoint.endpointURI}. These should both be functional now!
 
-Your Apigee API Key is : ${opts.apigeeAPIKey}. Pass this in as a queryparameter to your new proxy as apikey=${opts.apigeeAPIKey}
+Your Apigee API Key is : ${opts.apigeeAPIKey}. Pass this in as a queryparameter to your new proxy as follows:
+
+    https://<apigee_environment_host>${opts.basepath}?apikey=${opts.apigeeAPIKey}
+
+And with curl you can send an example query as follows (replace with your hostname):
+
+curl -X POST 'https://<apigee_environment_host>${opts.basepath}?apikey=${opts.apigeeAPIKey}' \\
+-H 'Accept-Encoding: gzip, deflate, br' -H 'Content-Type: application/json' -H 'Accept: application/json' \\ 
+--compressed --data-binary \\
+'{"query":"query RatesQuery {\\n  latest_rates(from: \\"SEK\\", to: \\"NOK\\") {\\n    amount\\n   base\\n    rates\\n  }\\n}","variables":{}}'
+
+${ opts.showCreds ? "What Follows here are your StepZen credentials. Store them in ~/.stepzen/stepzen-config.yaml \
+to use this setup with the canonical StepZen tools:"  : "" }
+    ${ opts.showCreds ? "account: " + opts.STEPZEN_ACCOUNT : "" }
+    ${ opts.showCreds ? "adminkey: " + opts.STEPZEN_ADMINKEY : "" }
+    ${ opts.showCreds ? "apikey: " + opts.STEPZEN_APIKEY : "" }
 `
   );
 }
@@ -265,7 +281,7 @@ function getSZPropertySet(apikey, token) {
           return false;
       }
       else {
-        console.log("Failed fetching the property set: %s", r.data);
+        console.log("Failed fetching the property set: %j", r.data);
         return false;
       }
     })
